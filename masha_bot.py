@@ -3,6 +3,8 @@ import requests
 import os
 import json
 from dotenv import load_dotenv
+from realtime import SyncRealtimeClient  # Исправлено для realtime 2.19.0
+import threading
 
 load_dotenv()
 
@@ -10,7 +12,7 @@ load_dotenv()
 SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_KEY = os.getenv("SUPABASE_KEY")
 if not SUPABASE_URL or not SUPABASE_KEY:
-    print("Ошибка: SUPABASE_URL или SUPABASE_KEY не найдены в .env!")
+    print("Ошибка: SUPABASE_URL или SUPABASE_KEY не найдены!")
     exit()
 
 supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
@@ -18,7 +20,7 @@ supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 # Grok API
 GROK_API_KEY = os.getenv("GROK_API_KEY")
 if not GROK_API_KEY:
-    print("Ошибка: GROK_API_KEY не найден в .env!")
+    print("Ошибка: GROK_API_KEY не найден!")
     exit()
 
 # Функции Supabase
@@ -87,23 +89,47 @@ def get_grok_response(user_input, personality, memories, other_personality_id=No
         return response.json()["choices"][0]["message"]["content"]
     else:
         print(f"API ошибка: {response.status_code}, {response.text}")
-        return f"Ой, ошибка API: {response.status_code}. Проверь кредиты или ключ! 😅"
+        return f"Ой, ошибка API: {response.status_code}. Проверь кредиты! 😅"
+
+# Realtime подписка
+def listen_realtime():
+    client = SyncRealtimeClient(
+        SUPABASE_URL,
+        SUPABASE_KEY,
+        options={"schema": "public"}
+    )
+    client.connect()
+
+    def on_memory_insert(payload):
+        print(f"Новое воспоминание: {payload['record']['fact']}")
+
+    def on_interaction_insert(payload):
+        print(f"Новый чат: {payload['record']['user_input']} -> {payload['record']['response'][:30]}...")
+
+    client.subscribe("INSERT", table="memory", callback=on_memory_insert)
+    client.subscribe("INSERT", table="interactions", callback=on_interaction_insert)
+
+    # Запускаем в отдельном потоке, чтобы не блокировать
+    client.start_listening()
 
 # Основной чат
 def main():
-    personality = get_personality(1)  # Маша
+    personality = get_personality(1)
     if not personality:
         print("Ошибка: Маша не найдена!")
         return
     memories = get_memories(1)
     print(f"Привет! Я Маша, {personality['traits']['age']} лет. Давай болтать? (упомяни 'Катя' для разговора с ней, exit для выхода)")
 
+    # Запускаем Realtime в отдельном потоке
+    threading.Thread(target=listen_realtime, daemon=True).start()
+
     while True:
         user_input = input("Ты: ").strip()
         if user_input.lower() == 'exit':
             print("Маша: Пока! Было весело 😘")
             break
-        other_personality_id = 2 if "катя" in user_input.lower() else None  # Катя = ID 2
+        other_personality_id = 2 if "катя" in user_input.lower() else None
         response = get_grok_response(user_input, personality, memories, other_personality_id)
         print(f"Маша: {response}")
         add_memory(1, f"Разговор: {user_input} -> {response[:50]}...")
