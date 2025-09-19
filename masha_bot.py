@@ -3,7 +3,7 @@ import requests
 import os
 import json
 from dotenv import load_dotenv
-from realtime import SyncRealtimeClient  # Исправлено для realtime 2.19.0
+from realtime import SyncRealtimeClient
 import threading
 
 load_dotenv()
@@ -93,11 +93,7 @@ def get_grok_response(user_input, personality, memories, other_personality_id=No
 
 # Realtime подписка
 def listen_realtime():
-    client = SyncRealtimeClient(
-        SUPABASE_URL,
-        SUPABASE_KEY,
-        options={"schema": "public"}
-    )
+    client = SyncRealtimeClient(SUPABASE_URL, SUPABASE_KEY)
     client.connect()
 
     def on_memory_insert(payload):
@@ -106,10 +102,9 @@ def listen_realtime():
     def on_interaction_insert(payload):
         print(f"Новый чат: {payload['record']['user_input']} -> {payload['record']['response'][:30]}...")
 
-    client.subscribe("INSERT", table="memory", callback=on_memory_insert)
-    client.subscribe("INSERT", table="interactions", callback=on_interaction_insert)
+    client.subscribe("INSERT", table="memory", schema="public", callback=on_memory_insert)
+    client.subscribe("INSERT", table="interactions", schema="public", callback=on_interaction_insert)
 
-    # Запускаем в отдельном потоке, чтобы не блокировать
     client.start_listening()
 
 # Основной чат
