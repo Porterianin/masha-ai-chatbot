@@ -3,7 +3,6 @@ import requests
 import os
 import json
 from dotenv import load_dotenv
-from realtime import RealtimeClient
 import asyncio
 
 load_dotenv()
@@ -93,16 +92,25 @@ def get_grok_response(user_input, personality, memories, other_personality_id=No
 
 # Realtime подписка
 async def listen_realtime():
-    client = RealtimeClient(SUPABASE_URL, SUPABASE_KEY)
-    memory_channel = client.channel("public:memory")
-    memory_channel.on("INSERT", lambda payload: print(f"Новое воспоминание: {payload['record']['fact']}"))
-    memory_channel.subscribe()
+    def on_memory_insert(payload):
+        print(f"Новое воспоминание: {payload['record']['fact']}")
 
-    interactions_channel = client.channel("public:interactions")
-    interactions_channel.on("INSERT", lambda payload: print(f"Новый чат: {payload['record']['user_input']} -> {payload['record']['response'][:30]}..."))
-    interactions_channel.subscribe()
+    def on_interaction_insert(payload):
+        print(f"Новый чат: {payload['record']['user_input']} -> {payload['record']['response'][:30]}...")
 
-    await client.listen()
+    # Подписка на memory
+    supabase.realtime.channel("public:memory").on(
+        "INSERT", on_memory_insert
+    ).subscribe()
+
+    # Подписка на interactions
+    supabase.realtime.channel("public:interactions").on(
+        "INSERT", on_interaction_insert
+    ).subscribe()
+
+    # Запускаем слушатель
+    while True:
+        await asyncio.sleep(1)  # Держим цикл активным
 
 # Основной чат
 async def main():

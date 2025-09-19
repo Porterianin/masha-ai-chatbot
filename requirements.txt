@@ -1,5 +1,4 @@
-supabase
+supabase>=2.0.0
 requests
 python-dotenv
-realtime==2.19.0
 websockets>=11,<16
