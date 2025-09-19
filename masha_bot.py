@@ -1,72 +1,114 @@
 from supabase import create_client
 import requests
+import os
 import json
+from dotenv import load_dotenv
 
-# Настройки Supabase (замени на свои ключи из supabase_keys.txt)
-SUPABASE_URL = "https://bvojjnipdrnjbelanjqs.supabase.co"  # Например, https://xyz.supabase.co
-SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJ2b2pqbmlwZHJuamJlbGFuanFzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTgyNTQzNzQsImV4cCI6MjA3MzgzMDM3NH0.pyOX6bS-8lJCijDPwhCvzqzgLdFadDULL4J3UTL5EE8"  # Например, eyJhb...
+load_dotenv()
 
-# Инициализация Supabase
+# Supabase
+SUPABASE_URL = os.getenv("SUPABASE_URL")
+SUPABASE_KEY = os.getenv("SUPABASE_KEY")
+if not SUPABASE_URL or not SUPABASE_KEY:
+    print("Ошибка: SUPABASE_URL или SUPABASE_KEY не найдены в .env!")
+    exit()
+
 supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 
-# Функция: Получить данные о Маше
+# Grok API
+GROK_API_KEY = os.getenv("GROK_API_KEY")
+if not GROK_API_KEY:
+    print("Ошибка: GROK_API_KEY не найден в .env!")
+    exit()
+
+# Функции Supabase
 def get_personality(personality_id=1):
     response = supabase.table("personality").select("*").eq("id", personality_id).execute()
     return response.data[0] if response.data else {}
 
-# Функция: Получить воспоминания Маши
 def get_memories(personality_id=1):
     response = supabase.table("memory").select("fact").eq("personality_id", personality_id).execute()
     return [row["fact"] for row in response.data]
 
-# Функция: Добавить новое воспоминание
+def get_interactions_with_other(personality_id=1, other_personality_id=None):
+    query = supabase.table("interactions").select("user_input, response").eq("personality_id", personality_id)
+    if other_personality_id:
+        query = query.eq("other_personality_id", other_personality_id)
+    response = query.execute()
+    return [(row["user_input"], row["response"]) for row in response.data]
+
 def add_memory(personality_id, fact):
     supabase.table("memory").insert({"personality_id": personality_id, "fact": fact}).execute()
 
-# Функция: Добавить взаимодействие (разговор)
 def add_interaction(personality_id, user_input, response, other_personality_id=None):
     supabase.table("interactions").insert({
         "personality_id": personality_id,
         "other_personality_id": other_personality_id,
         "user_input": user_input,
         "response": response,
-        "interaction_type": "user_conversation"
+        "interaction_type": "character_interaction" if other_personality_id else "user_conversation"
     }).execute()
 
-# Функция: Отправить запрос в Grok API
-def get_grok_response(user_input, personality, memories):
+# Grok API
+def get_grok_response(user_input, personality, memories, other_personality_id=None):
+    other_personality = get_personality(other_personality_id) if other_personality_id else {}
+    other_info = (
+        f"Ты говоришь с {other_personality['name']}. Её черты: {json.dumps(other_personality.get('traits', {}))}. "
+        f"Её история: {other_personality.get('backstory', 'неизвестно')}. "
+        f"Прошлые разговоры с ней: {', '.join([f'{i[0]} -> {i[1][:30]}...' for i in get_interactions_with_other(personality['id'], other_personality_id)])}."
+    ) if other_personality else ""
     prompt = (
         f"Ты Маша, 18-летняя студентка. Твои черты: {json.dumps(personality['traits'])}. "
-        f"Твоя история: {personality['backstory']}. Воспоминания: {memories}. "
-        f"Отвечай как живая девушка, весёлая и саркастичная, на русском. "
-        f"Вот что тебе сказали konsekw: написали: {user_input}"
+        f"Твоя история: {personality['backstory']}. Воспоминания: {', '.join(memories[-5:])}." 
+        f"{other_info} Общайся как живая девушка: весёлая, саркастичная, с эмодзи. На русском. "
+        f"Не повторяй базовые факты. Ответь на: {user_input}"
     )
-    headers = {"Authorization": "Bearer ТВОЙ_GROK_API_KEY"}  # Замени на ключ API
+    headers = {
+        "Content-Type": "application/json",
+        "Authorization": f"Bearer {GROK_API_KEY}"
+    }
+    data = {
+        "messages": [
+            {
+                "role": "user",
+                "content": prompt
+            }
+        ],
+        "model": "grok-4",
+        "stream": False,
+        "temperature": 0.7
+    }
     response = requests.post(
         "https://api.x.ai/v1/chat/completions",
         headers=headers,
-        json={
-            "model": "grok-4",
-            "messages": [{"role": "user", "content": prompt}]
-        }
+        json=data
     )
-    return response.json()["choices"][0]["message"]["content"]
+    if response.status_code == 200:
+        return response.json()["choices"][0]["message"]["content"]
+    else:
+        print(f"API ошибка: {response.status_code}, {response.text}")
+        return f"Ой, ошибка API: {response.status_code}. Проверь кредиты или ключ! 😅"
 
-# Основная функция: Обработка разговора
+# Основной чат
 def main():
-    # Получаем данные Маши
-    personality = get_personality(1)
+    personality = get_personality(1)  # Маша
+    if not personality:
+        print("Ошибка: Маша не найдена!")
+        return
     memories = get_memories(1)
-    print(f"Маша: {personality['name']}, черты: {personality['traits']}")
+    print(f"Привет! Я Маша, {personality['traits']['age']} лет. Давай болтать? (упомяни 'Катя' для разговора с ней, exit для выхода)")
 
-    # Пример разговора
-    user_input = input("Ты: ")
-    response = get_grok_response(user_input, personality, memories)
-    print(f"Маша: {response}")
-
-    # Сохраняем разговор
-    add_memory(1, f"Пользователь сказал: {user_input}")
-    add_interaction(1, user_input, response)
+    while True:
+        user_input = input("Ты: ").strip()
+        if user_input.lower() == 'exit':
+            print("Маша: Пока! Было весело 😘")
+            break
+        other_personality_id = 2 if "катя" in user_input.lower() else None  # Катя = ID 2
+        response = get_grok_response(user_input, personality, memories, other_personality_id)
+        print(f"Маша: {response}")
+        add_memory(1, f"Разговор: {user_input} -> {response[:50]}...")
+        add_interaction(1, user_input, response, other_personality_id)
+        memories = get_memories(1)
 
 if __name__ == "__main__":
     main()
