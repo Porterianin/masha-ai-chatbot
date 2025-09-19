@@ -94,7 +94,6 @@ def get_grok_response(user_input, personality, memories, other_personality_id=No
 # Realtime подписка
 def listen_realtime():
     client = SyncRealtimeClient(SUPABASE_URL, SUPABASE_KEY)
-    client.connect()
 
     def on_memory_insert(payload):
         print(f"Новое воспоминание: {payload['record']['fact']}")
