@@ -3,8 +3,8 @@ import requests
 import os
 import json
 from dotenv import load_dotenv
-from realtime import SyncRealtimeClient
-import threading
+from realtime import RealtimeClient
+import asyncio
 
 load_dotenv()
 
@@ -92,24 +92,20 @@ def get_grok_response(user_input, personality, memories, other_personality_id=No
         return f"Ой, ошибка API: {response.status_code}. Проверь кредиты! 😅"
 
 # Realtime подписка
-def listen_realtime():
-    client = SyncRealtimeClient(SUPABASE_URL, SUPABASE_KEY)
-
-    # Подписка на таблицу memory
+async def listen_realtime():
+    client = RealtimeClient(SUPABASE_URL, SUPABASE_KEY)
     memory_channel = client.channel("public:memory")
     memory_channel.on("INSERT", lambda payload: print(f"Новое воспоминание: {payload['record']['fact']}"))
     memory_channel.subscribe()
 
-    # Подписка на таблицу interactions
     interactions_channel = client.channel("public:interactions")
     interactions_channel.on("INSERT", lambda payload: print(f"Новый чат: {payload['record']['user_input']} -> {payload['record']['response'][:30]}..."))
     interactions_channel.subscribe()
 
-    # Запускаем прослушивание
-    client.start_listening()
+    await client.listen()
 
 # Основной чат
-def main():
+async def main():
     personality = get_personality(1)
     if not personality:
         print("Ошибка: Маша не найдена!")
@@ -117,11 +113,13 @@ def main():
     memories = get_memories(1)
     print(f"Привет! Я Маша, {personality['traits']['age']} лет. Давай болтать? (упомяни 'Катя' для разговора с ней, exit для выхода)")
 
-    # Запускаем Realtime в отдельном потоке
-    threading.Thread(target=listen_realtime, daemon=True).start()
+    # Запускаем Realtime в фоне
+    loop = asyncio.get_event_loop()
+    loop.create_task(listen_realtime())
 
     while True:
-        user_input = input("Ты: ").strip()
+        user_input = await asyncio.get_event_loop().run_in_executor(None, input, "Ты: ")
+        user_input = user_input.strip()
         if user_input.lower() == 'exit':
             print("Маша: Пока! Было весело 😘")
             break
@@ -133,4 +131,4 @@ def main():
         memories = get_memories(1)
 
 if __name__ == "__main__":
-    main()
+    asyncio.run(main())
