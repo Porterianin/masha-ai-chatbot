@@ -95,15 +95,17 @@ def get_grok_response(user_input, personality, memories, other_personality_id=No
 def listen_realtime():
     client = SyncRealtimeClient(SUPABASE_URL, SUPABASE_KEY)
 
-    def on_memory_insert(payload):
-        print(f"Новое воспоминание: {payload['record']['fact']}")
+    # Подписка на таблицу memory
+    memory_channel = client.channel("public:memory")
+    memory_channel.on("INSERT", lambda payload: print(f"Новое воспоминание: {payload['record']['fact']}"))
+    memory_channel.subscribe()
 
-    def on_interaction_insert(payload):
-        print(f"Новый чат: {payload['record']['user_input']} -> {payload['record']['response'][:30]}...")
+    # Подписка на таблицу interactions
+    interactions_channel = client.channel("public:interactions")
+    interactions_channel.on("INSERT", lambda payload: print(f"Новый чат: {payload['record']['user_input']} -> {payload['record']['response'][:30]}..."))
+    interactions_channel.subscribe()
 
-    client.subscribe("INSERT", table="memory", schema="public", callback=on_memory_insert)
-    client.subscribe("INSERT", table="interactions", schema="public", callback=on_interaction_insert)
-
+    # Запускаем прослушивание
     client.start_listening()
 
 # Основной чат
