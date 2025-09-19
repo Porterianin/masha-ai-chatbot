@@ -1,3 +1,5 @@
 supabase
 requests
 python-dotenv
+realtime==2.19.0
+websockets>=11,<16
