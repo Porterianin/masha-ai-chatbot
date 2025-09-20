@@ -94,23 +94,20 @@ def get_grok_response(user_input, personality, memories, other_personality_id=No
 async def listen_realtime():
     try:
         print("Запускаем Realtime-подписку...")
-        # Инициализация Realtime с явным подключением
-        async with supabase.realtime.create_client() as realtime_client:
-            print("Realtime клиент создан, начинаем подписку...")
-            channel_memory = realtime_client.channel("public:memory")
-            channel_memory.on("INSERT", lambda payload: print(f"Новое воспоминание: {payload['record']['fact']}"))
-            await channel_memory.subscribe()
-            print("Подписка на memory установлена")
+        channel_memory = supabase.realtime.channel("public:memory")
+        channel_memory.on("INSERT", lambda payload: print(f"Новое воспоминание: {payload['record']['fact']}"))
+        await channel_memory.subscribe()
+        print("Подписка на memory установлена")
 
-            channel_interactions = realtime_client.channel("public:interactions")
-            channel_interactions.on("INSERT", lambda payload: print(f"Новый чат: {payload['record']['user_input']} -> {payload['record']['response'][:30]}..."))
-            await channel_interactions.subscribe()
-            print("Подписка на interactions установлена")
+        channel_interactions = supabase.realtime.channel("public:interactions")
+        channel_interactions.on("INSERT", lambda payload: print(f"Новый чат: {payload['record']['user_input']} -> {payload['record']['response'][:30]}..."))
+        await channel_interactions.subscribe()
+        print("Подписка на interactions установлена")
 
-            # Держим цикл событий активным
-            while True:
-                await asyncio.sleep(1)
-                print("Ожидаем Realtime-события...")
+        # Держим цикл событий активным
+        while True:
+            await asyncio.sleep(1)
+            print("Ожидаем Realtime-события...")
     except Exception as e:
         print(f"Ошибка Realtime: {str(e)}")
 
