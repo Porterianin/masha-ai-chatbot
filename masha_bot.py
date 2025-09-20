@@ -1,4 +1,4 @@
-from supabase import create_client
+from supabase import create_client, AsyncClient
 import requests
 import os
 import json
@@ -14,7 +14,7 @@ if not SUPABASE_URL or not SUPABASE_KEY:
     print("Ошибка: SUPABASE_URL или SUPABASE_KEY не найдены!")
     exit()
 
-supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
+supabase: AsyncClient = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 # Grok API
 GROK_API_KEY = os.getenv("GROK_API_KEY")
@@ -80,11 +80,12 @@ async def get_grok_response(user_input, personality, memories, other_personality
         "stream": False,
         "temperature": 0.7
     }
-    response = requests.post(
+    loop = asyncio.get_event_loop()
+    response = await loop.run_in_executor(None, lambda: requests.post(
         "https://api.x.ai/v1/chat/completions",
         headers=headers,
         json=data
-    )
+    ))
     if response.status_code == 200:
         return response.json()["choices"][0]["message"]["content"]
     else:
