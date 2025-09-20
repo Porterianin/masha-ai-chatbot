@@ -26,7 +26,7 @@ if not GROK_API_KEY:
 async def get_personality(personality_id=1):
     print(f"Запрос личности с id={personality_id}")
     query = supabase.from_("personality").select("*").eq("id", personality_id)
-    response = await query.execute()
+    response = await query.execute()  # Проверяем, возвращает ли execute корутин
     print(f"Тип ответа: {type(response)}, данные: {response.data if hasattr(response, 'data') else 'нет данных'}, корутина: {asyncio.iscoroutine(response)}")
     if response and hasattr(response, 'data'):
         return response.data[0] if response.data else {}
