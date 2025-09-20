@@ -1,4 +1,4 @@
-from supabase import create_client, Client
+from supabase import create_client
 import requests
 import os
 import json
@@ -14,7 +14,7 @@ if not SUPABASE_URL or not SUPABASE_KEY:
     print("Ошибка: SUPABASE_URL или SUPABASE_KEY не найдены!")
     exit()
 
-supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
+supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 # Grok API
 GROK_API_KEY = os.getenv("GROK_API_KEY")
@@ -94,21 +94,23 @@ def get_grok_response(user_input, personality, memories, other_personality_id=No
 async def listen_realtime():
     try:
         print("Запускаем Realtime-подписку...")
-        # Подключаемся к Realtime
-        channel_memory = supabase.realtime.channel("public:memory")
-        channel_memory.on("INSERT", lambda payload: print(f"Новое воспоминание: {payload['record']['fact']}"))
-        channel_memory.subscribe()
-        print("Подписка на memory установлена")
+        # Инициализация Realtime с явным подключением
+        async with supabase.realtime.create_client() as realtime_client:
+            print("Realtime клиент создан, начинаем подписку...")
+            channel_memory = realtime_client.channel("public:memory")
+            channel_memory.on("INSERT", lambda payload: print(f"Новое воспоминание: {payload['record']['fact']}"))
+            await channel_memory.subscribe()
+            print("Подписка на memory установлена")
 
-        channel_interactions = supabase.realtime.channel("public:interactions")
-        channel_interactions.on("INSERT", lambda payload: print(f"Новый чат: {payload['record']['user_input']} -> {payload['record']['response'][:30]}..."))
-        channel_interactions.subscribe()
-        print("Подписка на interactions установлена")
+            channel_interactions = realtime_client.channel("public:interactions")
+            channel_interactions.on("INSERT", lambda payload: print(f"Новый чат: {payload['record']['user_input']} -> {payload['record']['response'][:30]}..."))
+            await channel_interactions.subscribe()
+            print("Подписка на interactions установлена")
 
-        # Держим подключение активным
-        while True:
-            await asyncio.sleep(1)
-            print("Ожидаем Realtime-события...")  # Отладка
+            # Держим цикл событий активным
+            while True:
+                await asyncio.sleep(1)
+                print("Ожидаем Realtime-события...")
     except Exception as e:
         print(f"Ошибка Realtime: {str(e)}")
 
@@ -123,7 +125,7 @@ async def main():
 
     # Запускаем Realtime в фоне
     loop = asyncio.get_event_loop()
-    asyncio.ensure_future(listen_realtime())  # Используем ensure_future для совместимости
+    loop.create_task(listen_realtime())
 
     while True:
         user_input = await asyncio.get_event_loop().run_in_executor(None, input, "Ты: ")
