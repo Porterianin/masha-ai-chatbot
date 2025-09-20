@@ -28,21 +28,21 @@ async def get_personality(personality_id=1):
     return response.data[0] if response.data else {}
 
 async def get_memories(personality_id=1):
-    response = await supabase.table("memory").select("fact").eq("personality_id", personality_id).execute()
+    response = await supabase.from_("memory").select("fact").eq("personality_id", personality_id).execute()
     return [row["fact"] for row in response.data] if response.data else []
 
 async def get_interactions_with_other(personality_id=1, other_personality_id=None):
-    query = supabase.table("interactions").select("user_input, response").eq("personality_id", personality_id)
+    query = supabase.from_("interactions").select("user_input, response").eq("personality_id", personality_id)
     if other_personality_id:
         query = query.eq("other_personality_id", other_personality_id)
     response = await query.execute()
     return [(row["user_input"], row["response"]) for row in response.data] if response.data else []
 
 async def add_memory(personality_id, fact):
-    await supabase.table("memory").insert({"personality_id": personality_id, "fact": fact}).execute()
+    await supabase.from_("memory").insert({"personality_id": personality_id, "fact": fact}).execute()
 
 async def add_interaction(personality_id, user_input, response, other_personality_id=None):
-    await supabase.table("interactions").insert({
+    await supabase.from_("interactions").insert({
         "personality_id": personality_id,
         "other_personality_id": other_personality_id,
         "user_input": user_input,
