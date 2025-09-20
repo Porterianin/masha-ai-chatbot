@@ -104,9 +104,10 @@ async def listen_realtime():
         channel_interactions.subscribe()
         print("Подписка на interactions активна")
 
-        # Держим цикл для прослушивания
+        # Ожидаем события
         while True:
             await asyncio.sleep(1)
+            print("Ожидаем Realtime-события...")  # Отладка цикла
     except Exception as e:
         print(f"Ошибка Realtime: {str(e)}")
 
