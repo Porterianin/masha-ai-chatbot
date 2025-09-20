@@ -2,3 +2,4 @@ supabase>=2.0.0
 requests
 python-dotenv
 websockets>=11,<16
+streamlit
