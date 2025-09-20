@@ -24,7 +24,7 @@ if not GROK_API_KEY:
 
 # Функции Supabase
 async def get_personality(personality_id=1):
-    response = await supabase.table("personality").select("*").eq("id", personality_id).execute()
+    response = await supabase.from_("personality").select("*").eq("id", personality_id).execute()
     return response.data[0] if response.data else {}
 
 async def get_memories(personality_id=1):
