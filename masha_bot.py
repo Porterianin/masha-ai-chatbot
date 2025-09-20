@@ -94,6 +94,7 @@ def get_grok_response(user_input, personality, memories, other_personality_id=No
 async def listen_realtime():
     try:
         print("Запускаем Realtime-подписку...")
+        # Подписываемся на каналы
         channel_memory = supabase.realtime.channel("public:memory")
         channel_memory.on("INSERT", lambda payload: print(f"Новое воспоминание: {payload['record']['fact']}"))
         await channel_memory.subscribe()
@@ -104,9 +105,9 @@ async def listen_realtime():
         await channel_interactions.subscribe()
         print("Подписка на interactions установлена")
 
-        # Держим цикл событий активным
+        # Активно слушаем события
         while True:
-            await asyncio.sleep(1)
+            await asyncio.sleep(1)  # Поддерживаем цикл
             print("Ожидаем Realtime-события...")
     except Exception as e:
         print(f"Ошибка Realtime: {str(e)}")
@@ -122,7 +123,7 @@ async def main():
 
     # Запускаем Realtime в фоне
     loop = asyncio.get_event_loop()
-    loop.create_task(listen_realtime())
+    asyncio.ensure_future(listen_realtime())  # Гарантируем асинхронный запуск
 
     while True:
         user_input = await asyncio.get_event_loop().run_in_executor(None, input, "Ты: ")
