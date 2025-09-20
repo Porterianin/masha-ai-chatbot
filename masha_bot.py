@@ -29,14 +29,14 @@ async def get_personality(personality_id=1):
 
 async def get_memories(personality_id=1):
     response = await supabase.table("memory").select("fact").eq("personality_id", personality_id).execute()
-    return [row["fact"] for row in response.data]
+    return [row["fact"] for row in response.data] if response.data else []
 
 async def get_interactions_with_other(personality_id=1, other_personality_id=None):
     query = supabase.table("interactions").select("user_input, response").eq("personality_id", personality_id)
     if other_personality_id:
         query = query.eq("other_personality_id", other_personality_id)
     response = await query.execute()
-    return [(row["user_input"], row["response"]) for row in response.data]
+    return [(row["user_input"], row["response"]) for row in response.data] if response.data else []
 
 async def add_memory(personality_id, fact):
     await supabase.table("memory").insert({"personality_id": personality_id, "fact": fact}).execute()
@@ -65,26 +65,11 @@ async def get_grok_response(user_input, personality, memories, other_personality
         f"{other_info} Общайся как живая девушка: весёлая, саркастичная, с эмодзи. На русском. "
         f"Не повторяй базовые факты. Ответь на: {user_input}"
     )
-    headers = {
-        "Content-Type": "application/json",
-        "Authorization": f"Bearer {GROK_API_KEY}"
-    }
-    data = {
-        "messages": [
-            {
-                "role": "user",
-                "content": prompt
-            }
-        ],
-        "model": "grok-4",
-        "stream": False,
-        "temperature": 0.7
-    }
     loop = asyncio.get_event_loop()
     response = await loop.run_in_executor(None, lambda: requests.post(
         "https://api.x.ai/v1/chat/completions",
-        headers=headers,
-        json=data
+        headers={"Content-Type": "application/json", "Authorization": f"Bearer {GROK_API_KEY}"},
+        json={"messages": [{"role": "user", "content": prompt}], "model": "grok-4", "stream": False, "temperature": 0.7}
     ))
     if response.status_code == 200:
         return response.json()["choices"][0]["message"]["content"]
