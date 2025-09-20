@@ -24,31 +24,40 @@ if not GROK_API_KEY:
 
 # Функции Supabase
 async def get_personality(personality_id=1):
+    print(f"Запрос личности с id={personality_id}")
     response = await supabase.from_("personality").select("*").eq("id", personality_id).execute()
+    print(f"Тип ответа: {type(response)}, данные: {response.data if hasattr(response, 'data') else 'нет данных'}")
     if response and hasattr(response, 'data'):
         return response.data[0] if response.data else {}
     return {}
 
 async def get_memories(personality_id=1):
+    print(f"Запрос воспоминаний для id={personality_id}")
     response = await supabase.from_("memory").select("fact").eq("personality_id", personality_id).execute()
+    print(f"Тип ответа: {type(response)}, данные: {response.data if hasattr(response, 'data') else 'нет данных'}")
     if response and hasattr(response, 'data'):
         return [row["fact"] for row in response.data] if response.data else []
     return []
 
 async def get_interactions_with_other(personality_id=1, other_personality_id=None):
+    print(f"Запрос взаимодействий для id={personality_id}, other_id={other_personality_id}")
     query = supabase.from_("interactions").select("user_input, response").eq("personality_id", personality_id)
     if other_personality_id:
         query = query.eq("other_personality_id", other_personality_id)
     response = await query.execute()
+    print(f"Тип ответа: {type(response)}, данные: {response.data if hasattr(response, 'data') else 'нет данных'}")
     if response and hasattr(response, 'data'):
         return [(row["user_input"], row["response"]) for row in response.data] if response.data else []
     return []
 
 async def add_memory(personality_id, fact):
+    print(f"Добавление воспоминания для id={personality_id}: {fact}")
     response = await supabase.from_("memory").insert({"personality_id": personality_id, "fact": fact}).execute()
+    print(f"Тип ответа: {type(response)}, данные: {response.data if hasattr(response, 'data') else 'нет данных'}")
     return response
 
 async def add_interaction(personality_id, user_input, response, other_personality_id=None):
+    print(f"Добавление взаимодействия для id={personality_id}: {user_input}")
     await supabase.from_("interactions").insert({
         "personality_id": personality_id,
         "other_personality_id": other_personality_id,
