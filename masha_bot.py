@@ -50,13 +50,14 @@ async def add_interaction(personality_id, user_input, response, other_personalit
         "interaction_type": "character_interaction" if other_personality_id else "user_conversation"
     }).execute()
 
-# Grok API (синхронная, так как requests не асинхронный)
-def get_grok_response(user_input, personality, memories, other_personality_id=None):
-    other_personality = personality if not other_personality_id else get_personality(other_personality_id).result() if asyncio.iscoroutine(get_personality(other_personality_id)) else get_personality(other_personality_id)
+# Grok API
+async def get_grok_response(user_input, personality, memories, other_personality_id=None):
+    other_personality = await get_personality(other_personality_id) if other_personality_id else personality
+    interactions = await get_interactions_with_other(personality['id'], other_personality_id) if other_personality_id else []
     other_info = (
         f"Ты говоришь с {other_personality['name']}. Её черты: {json.dumps(other_personality.get('traits', {}))}. "
         f"Её история: {other_personality.get('backstory', 'неизвестно')}. "
-        f"Прошлые разговоры с ней: {', '.join([f'{i[0]} -> {i[1][:30]}...' for i in get_interactions_with_other(personality['id'], other_personality_id).result() if asyncio.iscoroutine(get_interactions_with_other(personality['id'], other_personality_id)) else get_interactions_with_other(personality['id'], other_personality_id)])}."
+        f"Прошлые разговоры с ней: {', '.join([f'{i[0]} -> {i[1][:30]}...' for i in interactions])}."
     ) if other_personality_id else ""
     prompt = (
         f"Ты Маша, 18-летняя студентка. Твои черты: {json.dumps(personality['traits'])}. "
@@ -131,7 +132,7 @@ async def main():
             print("Маша: Пока! Было весело 😘")
             break
         other_personality_id = 2 if "катя" in user_input.lower() else None
-        response = get_grok_response(user_input, personality, memories, other_personality_id)
+        response = await get_grok_response(user_input, personality, memories, other_personality_id)
         print(f"Маша: {response}")
         await add_memory(1, f"Разговор: {user_input} -> {response[:50]}...")
         await add_interaction(1, user_input, response, other_personality_id)
